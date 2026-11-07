@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Japan Tyre Center</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial;background:#eef2f7;color:#172b45}
+header{background:#102b50;color:white;text-align:center;padding:22px}
+main{max-width:700px;margin:auto;padding:15px}
+.card{background:white;padding:18px;border-radius:12px;margin:12px 0;box-shadow:0 2px 8px #ccd3dd}
+input,select,button{width:100%;padding:12px;margin:7px 0;border:1px solid #ccd3dd;border-radius:7px;font-size:15px}
+button{background:#102b50;color:white;border:0;cursor:pointer}
+.danger{background:#b32626}
+.green{background:#147746}
+.hidden{display:none}
+nav{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.item{border-bottom:1px solid #ddd;padding:12px 0}
+.small{font-size:13px;color:#637083}
+</style>
+</head>
+<body>
+
+<header>
+<h2>JAPAN TYRE CENTER</h2>
+<p>TYRE MANAGEMENT SYSTEM</p>
+</header>
+
+<main>
+<section id="login" class="card">
+<h3>Secure Login</h3>
+<nav>
+<button onclick="choose('admin')">Admin Login</button>
+<button onclick="choose('user')">User Login</button>
+</nav>
+<p id="role">Select Account</p>
+<input id="username" placeholder="Username">
+<input id="password" type="password" placeholder="Password">
+<button onclick="login()">LOGIN</button>
+<p class="small">Default Admin: admin / alpha2x</p>
+<p class="small">Default User: user / alpha2x</p>
+</section>
+
+<section id="app" class="hidden">
+<div class="card">
+<h3 id="welcome"></h3>
+<button onclick="logout()" class="danger">Logout</button>
+</div>
+
+<div class="card">
+<h3>Search Tyre</h3>
+<input id="search" placeholder="Search vehicle or tyre size..." oninput="showRecords()">
+<select id="filter" onchange="showRecords()">
+<option value="">All Categories</option>
+<option>Car</option>
+<option>Motorcycle</option>
+<option>Raksha</option>
+<option>Truck</option>
+</select>
+<div id="records"></div>
+</div>
+
+<section id="adminPanel" class="hidden">
+<div class="card">
+<h3>Add / Edit Tyre Record</h3>
+<input id="vehicle" placeholder="Vehicle name">
+<select id="category">
+<option>Car</option>
+<option>Motorcycle</option>
+<option>Raksha</option>
+<option>Truck</option>
+</select>
+<input id="front" placeholder="Front tyre size">
+<input id="rear" placeholder="Rear tyre size">
+<input id="tube" placeholder="Tube size">
+<input id="notes" placeholder="Notes (optional)">
+<button onclick="saveRecord()">SAVE RECORD</button>
+<button class="danger" onclick="cancelEdit()">CANCEL EDIT</button>
+</div>
+
+<div class="card">
+<h3>Account Passwords</h3>
+<label>New Admin Password</label>
+<input id="adminPass" type="password" placeholder="New admin password">
+<button onclick="changePass('admin')">CHANGE ADMIN PASSWORD</button>
+<label>New User Password</label>
+<input id="userPass" type="password" placeholder="New user password">
+<button onclick="changePass('user')">CHANGE USER PASSWORD</button>
+</div>
+
+<div class="card">
+<h3>Data Backup</h3>
+<button class="green" onclick="backup()">DOWNLOAD BACKUP</button>
+<input type="file" id="backupFile" accept=".json">
+<button onclick="restore()">RESTORE BACKUP</button>
+</div>
+</section>
+</section>
+</main>
+
+<script>
+let roleSelected="";
+let currentRole="";
+let editId=null;
+
+let accounts=JSON.parse(localStorage.getItem("jtc_accounts")) || {
+ admin:"alpha2x",
+ user:"alpha2x"
+};
+
+let data=JSON.parse(localStorage.getItem("jtc_records")) || [];
+
+function choose(role){
+ roleSelected=role;
+ document.getElementById("role").innerText=role.toUpperCase()+" LOGIN";
+ document.getElementById("username").value=role;
+}
+
+function login(){
+ let u=document.getElementById("username").value.trim();
+ let p=document.getElementById("password").value;
+ if(!roleSelected){alert("Select Admin or User");return;}
+ if(u!==roleSelected || p!==accounts[roleSelected]){
+ alert("Wrong username or password");return;
+ }
+ currentRole=roleSelected;
+ document.getElementById("login").classList.add("hidden");
+ document.getElementById("app").classList.remove("hidden");
+ document.getElementById("welcome").innerText="Welcome "+currentRole.toUpperCase();
+ document.getElementById("adminPanel").classList.toggle("hidden",currentRole!=="admin");
+ showRecords();
+}
+
+function logout(){
+ currentRole="";
+ roleSelected="";
+ document.getElementById("app").classList.add("hidden");
+ document.getElementById("login").classList.remove("hidden");
+ document.getElementById("password").value="";
+ document.getElementById("role").innerText="Select Account";
+}
+
+function saveRecord(){
+ let v=document.getElementById("vehicle").value.trim();
+ let f=document.getElementById("front").value.trim();
+ let r=document.getElementById("rear").value.trim();
+ if(!v){alert("Enter vehicle name");return;}
+
+ let record={
+ id:editId || Date.now(),
+ vehicle:v,
+ category:document.getElementById("category").value,
+ front:f,
+ rear:r,
+ tube:document.getElementById("tube").value,
+ notes:document.getElementById("notes").value
+ };
+
+ if(editId!==null){
+ data=data.map(x=>x.id===editId?record:x);
+ }else{
+ data.push(record);
+ }
+ localStorage.setItem("jtc_records",JSON.stringify(data));
+ cancelEdit();
+ showRecords();
+ alert("Record saved successfully");
+}
+
+function showRecords(){
+ let q=(document.getElementById("search").value||"").toLowerCase();
+ let c=document.getElementById("filter").value;
+ let box=document.getElementById("records");
+ box.innerHTML="";
+
+ let found=data.filter(x=>
+ (x.vehicle+" "+x.front+" "+x.rear+" "+x.tube+" "+x.category).toLowerCase().includes(q)
+ && (!c || x.category===c)
+ );
+
+ if(found.length===0){box.innerHTML="<p>No records found</p>";return;}
+
+ found.forEach(x=>{
+ let div=document.createElement("div");
+ div.className="item";
+ let title=document.createElement("b");
+ title.textContent=x.vehicle+" ("+x.category+")";
+ div.appendChild(title);
+
+ let info=document.createElement("p");
+ info.textContent="Front: "+x.front+" | Rear: "+x.rear+
+ " | Tube: "+x.tube+" | Notes: "+x.notes;
+ div.appendChild(info);
+
+ if(currentRole==="admin"){
+ let edit=document.createElement("button");
+ edit.textContent="EDIT";
+ edit.onclick=()=>editRecord(x.id);
+ div.appendChild(edit);
+
+ let del=document.createElement("button");
+ del.textContent="DELETE";
+ del.className="danger";
+ del.onclick=()=>deleteRecord(x.id);
+ div.appendChild(del);
+ }
+ box.appendChild(div);
+ });
+}
+
+function editRecord(id){
+ let x=data.find(a=>a.id===id);
+ if(!x)return;
+ editId=id;
+ document.getElementById("vehicle").value=x.vehicle;
+ document.getElementById("category").value=x.category;
+ document.getElementById("front").value=x.front;
+ document.getElementById("rear").value=x.rear;
+ document.getElementById("tube").value=x.tube;
+ document.getElementById("notes").value=x.notes;
+ window.scrollTo(0,0);
+}
+
+function deleteRecord(id){
+ if(!confirm("Delete this record?"))return;
+ data=data.filter(x=>x.id!==id);
+ localStorage.setItem("jtc_records",JSON.stringify(data));
+ showRecords();
+}
+
+function cancelEdit(){
+ editId=null;
+ ["vehicle","front","rear","tube","notes"].forEach(id=>{
+ document.getElementById(id).value="";
+ });
+ document.getElementById("category").value="Car";
+}
+
+function changePass(role){
+ let field=document.getElementById(role==="admin"?"adminPass":"userPass");
+ let p=field.value;
+ if(p.length<6){alert("Password must be at least 6 characters");return;}
+ accounts[role]=p;
+ localStorage.setItem("jtc_accounts",JSON.stringify(accounts));
+ field.value="";
+ alert(role.toUpperCase()+" password changed");
+}
+
+function backup(){
+ let file=new Blob([JSON.stringify({
+ records:data,accounts:accounts
+ },null,2)],{type:"application/json"});
+ let a=document.createElement("a");
+ a.href=URL.createObjectURL(file);
+ a.download="Japan_Tyre_Backup.json";
+ a.click();
+ URL.revokeObjectURL(a.href);
+}
+
+function restore(){
+ let file=document.getElementById("backupFile").files[0];
+ if(!file){alert("Select backup file");return;}
+ let reader=new FileReader();
+ reader.onload=()=>{
+ try{
+ let b=JSON.parse(reader.result);
+ if(!Array.isArray(b.records)||!b.accounts ||
+ !b.accounts.admin || !b.accounts.user)throw Error();
+ data=b.records;
+ accounts=b.accounts;
+ localStorage.setItem("jtc_records",JSON.stringify(data));
+ localStorage.setItem("jtc_accounts",JSON.stringify(accounts));
+ showRecords();
+ alert("Backup restored");
+ }catch(e){alert("Invalid backup file");}
+ };
+ reader.readAsText(file);
+}
+</script>
+</body>
+</html>
